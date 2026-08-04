@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kalender PWA Ultimate Standard</title>
+    
+    <!-- PWA Manifest Verlinkung für Android / Google Play Store -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%);
+            background-attachment: fixed;
+            color: #ffffff;
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 90px;
+        }
+
+        /* --- APP HEADER STYLING --- */
+        .app-header {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: transparent;
+            color: #f8fafc;
+        }
+
+        .app-header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.9);
+            text-transform: uppercase;
+        }
+
+        .btn-settings {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(30, 41, 59, 0.7);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+            padding: 0;
+            font-size: 1.2rem;
+        }
+
+        .btn-settings:hover {
+            background: #123361;
+            border-color: #38bdf8;
+            color: #ffffff;
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 6px 20px rgba(18, 51, 97, 0.5);
+        }
+
+        .page {
+            display: none;
+            width: 100%;
+            max-width: 500px;
+            padding: 0 16px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @media (min-width: 768px), (orientation: landscape) {
+            .page { max-width: 1200px; }
+        }
+
+        .page.active {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            padding: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            text-align: center;
+            position: relative;
+        }
+
+        /* OBEN FÄLLIGES EREIGNIS BANNER */
+        .due-stack-container {
+            position: relative;
+            width: 100%;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .due-stack-card {
+            background: rgba(244, 63, 94, 0.25);
+            backdrop-filter: blur(20px);
+            border: 1px solid #f43f5e;
+            border-top: 4px solid #f43f5e;
+            border-radius: 24px;
+            padding: 16px 20px;
+            box-shadow: 0 10px 30px rgba(244, 63, 94, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .due-stack-behind {
+            position: absolute;
+            bottom: -6px;
+            left: 4%;
+            width: 92%;
+            height: 100%;
+            background: rgba(244, 63, 94, 0.1);
+            border-radius: 24px;
+            z-index: -1;
+            border: 1px solid rgba(244, 63, 94, 0.3);
+        }
+
+        .btn-done {
+            background: #22c55e;
+            color: #0f172a;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .btn-done:hover {
+            background: #16a34a;
+            color: #ffffff;
+            transform: scale(1.04);
+        }
+
+        .card.accent-clock { border-top: 4px solid #38bdf8; }
+        .card.accent-feiertag { border-top: 4px solid #eab308; cursor: pointer; transition: transform 0.2s; }
+        .card.accent-feiertag:hover { transform: translateY(-2px); }
+        .card.accent-ferien { border-top: 4px solid #22c55e; cursor: pointer; transition: transform 0.2s; }
+        .card.accent-ferien:hover { transform: translateY(-2px); }
+        .card.accent-event { border-top: 4px solid #f43f5e; }
+        .card.accent-all-events { border-top: 4px solid #a855f7; }
+
+        .card-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 8px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .card-sub {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .clock-time {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: #38bdf8;
+            margin: 6px 0;
+        }
+
+        .events-scroll-list {
+            max-height: 220px; 
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+            padding-right: 4px;
+        }
+
+        .events-scroll-list::-webkit-scrollbar { width: 4px; }
+        .events-scroll-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+
+        .event-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.06);
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            min-height: 48px;
+        }
+
+        .event-item-details { text-align: left; }
+        .event-item-title { font-weight: 600; color: #ffffff; display: block; }
+        .event-item-time { font-size: 0.75rem; color: #38bdf8; }
+
+        .ft-theme-ostern { background: rgba(254, 249, 195, 0.15); border-left: 4px solid #eab308; }
+        .ft-theme-weihnachten { background: rgba(254, 226, 226, 0.15); border-left: 4px solid #f43f5e; }
+        .ft-theme-neujahr { background: rgba(243, 232, 255, 0.15); border-left: 4px solid #a855f7; }
+        .ft-theme-mai { background: rgba(220, 252, 231, 0.15); border-left: 4px solid #22c55e; }
+        .ft-theme-einheit { background: rgba(224, 242, 254, 0.15); border-left: 4px solid #0284c7; }
+        .ft-theme-frauentag { background: rgba(252, 231, 243, 0.15); border-left: 4px solid #ec4899; }
+        .ft-theme-herbst { background: rgba(255, 237, 213, 0.15); border-left: 4px solid #f97316; }
+        .ft-theme-ferien { background: rgba(34, 197, 94, 0.15); border-left: 4px solid #22c55e; }
+        .ft-theme-default { background: rgba(255, 255, 255, 0.08); border-left: 4px solid #a855f7; }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .calendar-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .calendar-header button {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* GRID MIT KALENDERWOCHE (8 Spalten) */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: 32px repeat(7, 1fr);
+            gap: 5px;
+        }
+
+        .day-name {
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .day-name.kw-header { color: rgba(255,255,255,0.4); }
+        .day-name.weekday { color: #38bdf8; }
+        .day-name.weekend { color: #fb7185; }
+
+        .kw-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            border: 1px dashed rgba(255, 255, 255, 0.05);
+        }
+
+        .day-cell {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 4px 2px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .day-number {
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 6px;
+        }
+
+        .day-cell.today {
+            border-color: #38bdf8;
+            box-shadow: inset 0 0 12px rgba(56, 189, 248, 0.3);
+        }
+
+        .day-cell.has-event::after {
+            content: '';
+            width: 5px;
+            height: 5px;
+            background: #a855f7;
+            box-shadow: 0 0 8px #a855f7;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 3px;
+        }
+
+        .day-events-container {
+            display: flex;
+            width: 100%;
+            max-height: 100%;
+            overflow-y: auto;
+            flex-direction: column;
+            gap: 2px;
+            margin-top: 3px;
+        }
+
+        .day-events-container::-webkit-scrollbar { width: 0px; background: transparent; }
+
+        .mini-event-card {
+            background: rgba(56, 189, 248, 0.15);
+            border-left: 3px solid #38bdf8;
+            border-radius: 4px;
+            padding: 1px 4px;
+            font-size: 0.65rem;
+            text-align: left;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0;
+            line-height: 1.2;
+        }
+
+        .mini-event-card.recurring {
+            border-left-color: #eab308;
+            background: rgba(234, 179, 8, 0.15);
+        }
+
+        .mini-event-card.feiertag-card { font-weight: bold; }
+
+        .mini-event-card.ferien-card {
+            border-left-color: #22c55e;
+            background: rgba(34, 197, 94, 0.2);
+            color: #86efac;
+            font-weight: 600;
+        }
+
+        .mini-event-time {
+            font-weight: 700;
+            color: #38bdf8;
+            font-size: 0.6rem;
+            margin-right: 3px;
+        }
+
+        /* --- HAUPT-NAVIGATION AM BODEN --- */
+        nav {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 40px;
+            padding: 6px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        nav button {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            padding: 12px 24px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        nav button.active {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+
+        /* --- TABLET & DESKTOP --- */
+        @media (min-width: 768px) and (min-height: 601px) {
+            .page { max-width: 1200px; }
+            .calendar-grid { gap: 8px; grid-template-columns: 40px repeat(7, 1fr); }
+            .day-cell {
+                aspect-ratio: auto;
+                height: 110px;
+                padding: 8px;
+                border-radius: 16px;
+                background: rgba(15, 23, 42, 0.4);
+            }
+            .day-cell.has-event::after { display: none; }
+            .day-events-container { display: flex; }
+        }
+
+        /* --- SMARTPHONE QUERFORMAT --- */
+        @media (orientation: landscape) and (max-height: 600px) {
+            body { padding-bottom: 70px; }
+            .page { max-width: 100%; padding: 0 12px; }
+            #page-overview.active {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+            .card { padding: 12px; border-radius: 16px; }
+            .clock-time { font-size: 1.8rem; margin: 2px 0; }
+            .calendar-grid { gap: 3px; }
+            .day-cell { aspect-ratio: auto; min-height: 40px; padding: 2px 3px; border-radius: 8px; }
+            .day-number { font-size: 0.75rem; padding: 1px 3px; }
+            nav { bottom: 8px; padding: 4px; }
+            nav button { padding: 6px 16px; font-size: 0.8rem; }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(12px);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            padding: 24px;
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+
+        .form-group { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+        .form-group label { font-size: 0.75rem; color: rgba(255,255,255,0.6); text-transform: uppercase; font-weight: 600;}
+
+        .modal-content input, .modal-content select {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(15, 23, 42, 0.8);
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .flex-row { display: flex; gap: 10px; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 8px; }
+
+        .btn { flex: 1; padding: 12px; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #38bdf8; color: #0f172a; }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: white; }
+        .btn-danger { background: rgba(244, 63, 94, 0.2); color: #f43f5e; border: 1px solid #f43f5e; }
+
+        .setting-group { margin-bottom: 12px; }
+        .setting-group.row-action { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+        .setting-desc { margin: 4px 0 0 0; font-size: 0.8rem; color: rgba(255,255,255,0.6); }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            background-color: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .divider {
+            border: 0;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.15);
+            margin: 16px 0;
+        }
+
+        .btn-action {
+            background-color: rgba(255,255,255,0.1);
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .btn-action:hover { background-color: rgba(255,255,255,0.2); }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-close {
+            background: transparent;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            color: #94a3b8;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 26px;
+            flex-shrink: 0;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(255, 255, 255, 0.2);
+            transition: .3s;
+            border-radius: 26px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: #4cd964; }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .day-cell.is-ferien {
+            background: rgba(34, 197, 94, 0.15) !important;
+            border: 1px dashed rgba(34, 197, 94, 0.5);
+        }
+
+        .modal-events-list {
+            margin-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .existing-event-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+        }
+
+        .btn-delete-small {
+            background: rgba(244, 63, 94, 0.2);
+            border: 1px solid #f43f5e;
+            color: #f43f5e;
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        body, .calendar-wrapper { overflow-x: hidden; }
+        #page-calendar { will-change: transform; }
+    </style>
+</head>
+<body>
+
+    <!-- APP HEADER -->
+    <header class="app-header">
+        <h1>Kalender</h1>
+        <button class="btn-settings" onclick="openSettingsModal()" title="Einstellungen">⚙️</button>
+    </header>
+
+    <!-- EINSTELLUNGEN MODAL -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Einstellungen</h2>
+                <button class="btn-close" onclick="closeSettingsModal()">&times;</button>
+            </div>
+
+            <div class="modal-body" style="padding-top: 12px;">
+                <div class="setting-group">
+                    <label for="bl-select"><strong>Bundesland für Feiertage & Ferien:</strong></label>
+                    <select id="bl-select" class="form-control" onchange="changeBundesland(this.value)" style="margin-top: 6px;">
+                        <option value="BE">Berlin (BE)</option>
+                        <option value="BW">Baden-Württemberg (BW)</option>
+                        <option value="BY">Bayern (BY)</option>
+                        <option value="BB">Brandenburg (BB)</option>
+                        <option value="HB">Bremen (HB)</option>
+                        <option value="HH">Hamburg (HH)</option>
+                        <option value="HE">Hessen (HE)</option>
+                        <option value="MV">Mecklenburg-Vorpommern (MV)</option>
+                        <option value="NI">Niedersachsen (NI)</option>
+                        <option value="NW">Nordrhein-Westfalen (NW)</option>
+                        <option value="RP">Rheinland-Pfalz (RP)</option>
+                        <option value="SL">Saarland (SL)</option>
+                        <option value="SN">Sachsen (SN)</option>
+                        <option value="ST">Sachsen-Anhalt (ST)</option>
+                        <option value="SH">Schleswig-Holstein (SH)</option>
+                        <option value="TH">Thüringen (TH)</option>
+                    </select>
+                </div>
+
+                <hr class="divider">
+
+                <div class="setting-group row-action">
+                    <div>
+                        <strong>Schulferien anzeigen</strong>
+                        <p class="setting-desc">Markiert Ferientage im Kalender grün.</p>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="ferienToggle" onchange="toggleFerien(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <hr class="divider">
+
+                <div class="setting-group row-action">
+                    <div>
+                        <strong>Push-Benachrichtigungen</strong>
+                        <p class="setting-desc">Erhalte Erinnerungen wie WhatsApp.</p>
+                    </div>
+                    <button class="btn-action" onclick="requestNotificationPermission()">🔔 Aktivieren</button>
+                </div>
+
+                <hr class="divider">
+
+                <div class="setting-group row-action">
+                    <div>
+                        <strong>Kalender Exportieren</strong>
+                        <p class="setting-desc">Lade deine Termine als .ics Datei herunter.</p>
+                    </div>
+                    <button class="btn-action" onclick="exportICal()">📥 Export (.ics)</button>
+                </div>
+
+                <hr class="divider">
+
+                <div class="setting-group row-action">
+                    <div>
+                        <strong>Kalender Importieren</strong>
+                        <p class="setting-desc">Synchronisiere .ics Dateien von externen Apps.</p>
+                    </div>
+                    <input type="file" id="ics-file-input" accept=".ics" onchange="importICal(event)" style="display:none;">
+                    <button class="btn-action" onclick="document.getElementById('ics-file-input').click()">📤 Import (.ics)</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 12px; text-align: right;">
+                <button class="btn btn-primary" onclick="closeSettingsModal()">Fertig</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEITE 1: ÜBERSICHT -->
+    <div id="page-overview" class="page active">
+        <div id="due-stack-wrapper" class="due-stack-container" style="display: none;">
+            <div class="due-stack-card">
+                <div style="text-align: left; flex: 1;">
+                    <div style="font-size: 0.7rem; text-transform: uppercase; color: #f43f5e; font-weight: 800;" id="due-stack-count">⏰ FÄLLIGES EREIGNIS (1 von 1)</div>
+                    <div style="font-size: 1.1rem; font-weight: 800; color: #ffffff; margin-top: 2px;" id="due-stack-title">Termin...</div>
+                    <div style="font-size: 0.8rem; color: rgba(255,255,255,0.8);" id="due-stack-sub">Jetzt fällig</div>
+                </div>
+                <button class="btn-done" onclick="markDueEventDone()">✔ Erledigt</button>
+            </div>
+            <div id="due-stack-bg" class="due-stack-behind" style="display: none;"></div>
+        </div>
+
+        <div class="card accent-clock">
+            <div class="card-label">ÜBERSICHT</div>
+            <div id="clock-bl-name" style="font-size: 1.4rem; font-weight: bold; text-align: center; margin-top: 5px; color: #a5f3fc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">
+                Baden-Württemberg
+            </div>
+            <div id="clock" class="clock-time">00:00:00</div>
+            <div id="clock-date" class="card-sub">Lädt...</div>
+        </div>
+
+        <div class="card accent-feiertag" id="feiertag-widget" onclick="openFeiertageModal()">
+            <div class="card-label">
+                <span>Nächster Feiertag</span>
+                <span id="widget-bl-badge" style="background: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 6px; font-size: 0.7rem;">BE</span>
+            </div>
+            <div id="widget-feiertag-name" class="card-title">Berechne...</div>
+            <div id="widget-feiertag-date" class="card-sub">--.--.----</div>
+        </div>
+
+        <div class="card accent-ferien" id="ferien-widget" onclick="openFerienModal()">
+            <div class="card-label">
+                <span>Schulferien</span>
+                <span id="widget-ferien-bl-badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac; padding: 2px 6px; border-radius: 6px; font-size: 0.7rem;">BE</span>
+            </div>
+            <div id="widget-ferien-name" class="card-title">Berechne...</div>
+            <div id="widget-ferien-date" class="card-sub">--.--.----</div>
+        </div>
+
+        <div class="card accent-event">
+            <div class="card-label">Nächstes Ereignis / Geburtstag</div>
+            <div id="next-event-title" class="card-title">Keine Ereignisse</div>
+            <div id="next-event-date" class="card-sub">-</div>
+        </div>
+
+        <div class="card accent-all-events">
+            <div class="card-label">Anstehende Ereignisse & Serien</div>
+            <div id="all-events-list" class="events-scroll-list"></div>
+        </div>
+    </div>
+
+    <!-- SEITE 2: KALENDER -->
+    <div id="page-calendar" class="page">
+        <div class="card">
+            <div class="calendar-header">
+                <button onclick="changeMonth(-1)">&#10094;</button>
+                <div id="calendar-month-year" class="card-title" style="margin:0;"></div>
+                <div class="calendar-header-actions">
+                    <button class="btn-action" onclick="goToToday()" style="padding: 4px 10px; font-size: 0.8rem; height: 32px; border-radius: 16px;">Heute</button>
+                    <button onclick="changeMonth(1)">&#10095;</button>
+                </div>
+            </div>
+
+            <!-- Grid mit 8 Spalten: KW + Mo bis So -->
+            <div class="calendar-grid">
+                <div class="day-name kw-header">KW</div>
+                <div class="day-name weekday">Mo</div>
+                <div class="day-name weekday">Di</div>
+                <div class="day-name weekday">Mi</div>
+                <div class="day-name weekday">Do</div>
+                <div class="day-name weekday">Fr</div>
+                <div class="day-name weekend">Sa</div>
+                <div class="day-name weekend">So</div>
+            </div>
+
+            <div id="calendar-days" class="calendar-grid" style="margin-top: 8px;"></div>
+        </div>
+    </div>
+
+    <!-- BOTTON NAV -->
+    <nav>
+        <button id="nav-overview" class="active" onclick="switchPage('overview')">Übersicht</button>
+        <button id="nav-calendar" onclick="switchPage('calendar')">Kalender</button>
+    </nav>
+
+    <!-- EVENT EINGABE / BEARBEITEN MODAL -->
+    <div id="event-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-date-display" style="text-align: center;">Neues Ereignis</h3>
+            
+            <div class="form-group">
+                <label>Titel des Termins / Geburtstags</label>
+                <input type="text" id="event-title-input" placeholder="z. B. Urlaub, Schicht, Meeting...">
+            </div>
+
+            <!-- Standard: Einzelnes Datum & Zeit -->
+            <div class="flex-row">
+                <div class="form-group" style="flex:1;">
+                    <label id="label-start-date">Datum</label>
+                    <input type="date" id="event-start-date">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label id="label-start-time">Uhrzeit</label>
+                    <input type="time" id="event-start-time" value="09:00">
+                </div>
+            </div>
+
+            <!-- Schalter für Mehrtägige Termine / Urlaub / Intervall -->
+            <div class="setting-group row-action" style="margin: 4px 0; background: rgba(255, 255, 255, 0.05); padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                <div>
+                    <strong style="font-size: 0.85rem;">Mehrtägig / Urlaub (Intervall)</strong>
+                    <p class="setting-desc" style="font-size: 0.75rem;">Enddatum und Endzeit hinzufügen</p>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="event-is-range" onchange="toggleRangeFields()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- Dynamische Felder für Enddatum & Endzeit -->
+            <div id="range-fields-container" class="flex-row" style="display: none;">
+                <div class="form-group" style="flex:1;">
+                    <label>Enddatum</label>
+                    <input type="date" id="event-end-date">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Endzeit</label>
+                    <input type="time" id="event-end-time" value="10:00">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Wiederholung (iCal RRULE Standard)</label>
+                <select id="event-rrule" onchange="toggleUntilField()">
+                    <option value="NONE">Einmaliger Termin</option>
+                    <option value="DAILY">🔄 Täglich</option>
+                    <option value="CUSTOM_DAYS">🔁 Alle X Tage (Benutzerdefiniert)</option>
+                    <option value="WEEKLY">🔄 Wöchentlich</option>
+                    <option value="MONTHLY">📅 Monatlich</option>
+                    <option value="YEARLY">🎂 Jährlich (Geburtstag)</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="custom-interval-group" style="display:none;">
+                <label>Alle wie viel Tage?</label>
+                <input type="number" id="event-interval-days" min="1" value="2" placeholder="z. B. 2 für alle 2 Tage">
+            </div>
+
+            <div class="form-group" id="until-group" style="display:none;">
+                <label>Wiederholung Enddatum</label>
+                <input type="date" id="event-until-date">
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+                <button class="btn btn-primary" onclick="saveEvent()">Speichern</button>
+            </div>
+
+            <div id="modal-existing-events" class="modal-events-list"></div>
+        </div>
+    </div>
+
+    <!-- LÖSCHEN AUSWAHL-DIALOG (NUR DIESE INSTANZ ODER GESAMTE SERIE) -->
+    <div id="delete-choice-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h3 style="margin-bottom: 8px;">🔁 Serientermin löschen</h3>
+            <p style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-bottom: 16px;">
+                Möchtest du nur das Ereignis an diesem Tag entfernen oder die gesamte Serie beenden?
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <button class="btn btn-primary" onclick="confirmDeleteInstance()">Nur diesen Termin löschen</button>
+                <button class="btn btn-danger" onclick="confirmDeleteSeries()">Gesamte Serie löschen</button>
+                <button class="btn btn-secondary" onclick="closeDeleteChoiceModal()">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FEIERTAGE OVERLAY -->
+    <div id="feiertage-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="text-align: center;">🎉 Gesetzliche Feiertage</h3>
+            <div id="feiertage-modal-list" class="events-scroll-list" style="max-height: 60vh;"></div>
+            <button class="btn btn-secondary" onclick="closeFeiertageModal()" style="margin-top: 10px;">Schließen</button>
+        </div>
+    </div>
+
+    <!-- SCHULFERIEN OVERLAY -->
+    <div id="ferien-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="text-align: center;">🌴 Schulferien Übersicht</h3>
+            <div id="ferien-modal-list" class="events-scroll-list" style="max-height: 60vh;"></div>
+            <button class="btn btn-secondary" onclick="closeFerienModal()" style="margin-top: 10px;">Schließen</button>
+        </div>
+    </div>
+
+    <script>
+        let rawEvents = JSON.parse(localStorage.getItem('pwa_events_ical_final') || '[]');
+        let completedEvents = JSON.parse(localStorage.getItem('pwa_events_completed') || '{}');
+        let currentDate = new Date();
+        let selectedDateStr = "";
+        let editingEventId = null; 
+        let pendingDeleteInfo = null;
+
+        let audioCtx = null;
+        let triggeredAlarms = {};
+        let currentMinuteTracker = -1;
+        let dueEventsStack = [];
+
+        // FERIEN DATENBANK 2026
+        const schulferienData2026 = {
+            BW: [ { name: "Osterferien", s: "2026-03-30", e: "2026-04-11" }, { name: "Pfingstferien", s: "2026-05-26", e: "2026-06-05" }, { name: "Sommerferien", s: "2026-07-30", e: "2026-09-12" }, { name: "Herbstferien", s: "2026-10-26", e: "2026-10-30" }, { name: "Weihnachtsferien", s: "2026-12-23", e: "2027-01-09" } ],
+            BY: [ { name: "Frühjahrsferien", s: "2026-02-16", e: "2026-02-20" }, { name: "Osterferien", s: "2026-03-30", e: "2026-04-10" }, { name: "Pfingstferien", s: "2026-05-26", e: "2026-06-05" }, { name: "Sommerferien", s: "2026-08-03", e: "2026-09-14" }, { name: "Herbstferien", s: "2026-11-02", e: "2026-11-06" }, { name: "Weihnachtsferien", s: "2026-12-24", e: "2027-01-08" } ],
+            BE: [ { name: "Winterferien", s: "2026-02-02", e: "2026-02-07" }, { name: "Osterferien", s: "2026-03-30", e: "2026-04-10" }, { name: "Sommerferien", s: "2026-07-09", e: "2026-08-22" }, { name: "Herbstferien", s: "2026-10-19", e: "2026-10-31" }, { name: "Weihnachtsferien", s: "2026-12-23", e: "2027-01-02" } ],
+            BB: [ { name: "Winterferien", s: "2026-02-02", e: "2026-02-07" }, { name: "Osterferien", s: "2026-03-30", e: "2026-04-10" }, { name: "Sommerferien", s: "2026-07-09", e: "2026-08-22" }, { name: "Herbstferien", s: "2026-10-19", e: "2026-10-30" }, { name: "Weihnachtsferien", s: "2026-12-23", e: "2027-01-02" } ],
+            HB: [ { name: "Winterferien", s: "2026-02-02", e: "2026-02-03" }, { name: "Osterferien", s: "2026-03-23", e: "2026-04-07" }, { name: "Sommerferien", s: "2026-07-02", e: "2026-08-12" }, { name: "Herbstferien", s: "2026-10-12", e: "2026-10-24" }, { name: "Weihnachtsferien", s: "2026-12-23", e: "2027-01-09" } ],
+            HH: [ { name: "Frühjahrsferien", s: "2026-03-02", e: "2026-03-13" }, { name: "Sommerferien", s: "2026-07-09", e: "2026-08-19" }, { name: "Herbstferien", s: "2026-10-19", e: "2026-10-30" }, { name: "Weihnachtsferien", s: "2026-12-21", e: "2027-01-01" } ],
+            HE: [ { name: "Osterferien", s: "2026-03-30", e: "2026-04-11" }, { name: "Sommerferien", s: "2026-06-29", e: "2026-08-07" }, { name: "Herbstferien", s: "2026-10-05", e: "2026-10-17" }, { name: "Weihnachtsferien", s: "2026-12-23", e: "2027-01-13" } ],
+            MV: [ { name: "Winterferien", s: "2026-02-02", e: "2026-02-13" }, { name: "Osterferien", s: "2026-03-30", e: "2026-04-08" }, { name: "Sommerferien", s: "2026-07-13", e: "2026-08-22" }, { name: "Herbstferien", s: "2026-10-19", e: "2026-10-24" }, { name: "Weihnachtsferien", s: "2026-12-21", e: "2027-01-02" } ],
+            NI: [ { name: "Osterferien", s: "2026-03-23", e: "2026-04-07" }, { name: "Sommerferien", s: "2026-07-02", e: "2026-08-12" }, { name: "Herbstferien", s: "2026-10-12", e: "2026-10-24" }, { name: "Weihnachtsferien", s: "2026-12-23", e: "2027-01-09" } ],
+            NW: [ { name: "Osterferien", s: "2026-03-30", e: "2026-04-11" }, { name: "Sommerferien", s: "2026-07-20", e: "2026-09-01" }, { name: "Herbstferien", s: "2026-10-19", e: "2026-10-31" }, { name: "Weihnachtsferien", s: "2026-12-23", e: "2027-01-06" } ],
+            RP: [ { name: "Osterferien", s: "2026-03-30", e: "2026-04-10" }, { name: "Sommerferien", s: "2026-06-29", e: "2026-08-07" }, { name: "Herbstferien", s: "2026-10-05", e: "2026-10-16" }, { name: "Weihnachtsferien", s: "2026-12-23", e: "2027-01-08" } ],
+            SL: [ { name: "Osterferien", s: "2026-03-30", e: "2026-04-10" }, { name: "Sommerferien", s: "2026-06-29", e: "2026-08-07" }, { name: "Herbstferien", s: "2026-10-05", e: "2026-10-16" }, { name: "Weihnachtsferien", s: "2026-12-21", e: "2027-01-08" } ],
+            SN: [ { name: "Winterferien", s: "2026-02-09", e: "2026-02-21" }, { name: "Osterferien", s: "2026-04-03", e: "2026-04-10" }, { name: "Sommerferien", s: "2026-07-06", e: "2026-08-14" }, { name: "Herbstferien", s: "2026-10-12", e: "2026-10-24" }, { name: "Weihnachtsferien", s: "2026-12-23", e: "2027-01-02" } ],
+            ST: [ { name: "Winterferien", s: "2026-02-09", e: "2026-02-14" }, { name: "Osterferien", s: "2026-03-30", e: "2026-04-04" }, { name: "Sommerferien", s: "2026-07-04", e: "2026-08-14" }, { name: "Herbstferien", s: "2026-10-19", e: "2026-10-30" }, { name: "Weihnachtsferien", s: "2026-12-21", e: "2027-01-02" } ],
+            SH: [ { name: "Osterferien", s: "2026-03-30", e: "2026-04-17" }, { name: "Sommerferien", s: "2026-07-04", e: "2026-08-15" }, { name: "Herbstferien", s: "2026-10-12", e: "2026-10-24" }, { name: "Weihnachtsferien", s: "2026-12-21", e: "2027-01-06" } ],
+            TH: [ { name: "Winterferien", s: "2026-02-16", e: "2026-02-21" }, { name: "Osterferien", s: "2026-04-07", e: "2026-04-17" }, { name: "Sommerferien", s: "2026-07-06", e: "2026-08-14" }, { name: "Herbstferien", s: "2026-10-12", e: "2026-10-24" }, { name: "Weihnachtsferien", s: "2026-12-23", e: "2027-01-02" } ]
+        };
+
+        const bundeslaenderNamen = {
+            "BE": "Berlin", "BW": "Baden-Württemberg", "BY": "Bayern", "BB": "Brandenburg",
+            "HB": "Bremen", "HH": "Hamburg", "HE": "Hessen", "MV": "Mecklenburg-Vorpommern",
+            "NI": "Niedersachsen", "NW": "Nordrhein-Westfalen", "RP": "Rheinland-Pfalz", "SL": "Saarland",
+            "SN": "Sachsen", "ST": "Sachsen-Anhalt", "SH": "Schleswig-Holstein", "TH": "Thüringen"
+        };
+
+        // ISO 8601 KALENDERWOCHE BERECHNUNG
+        function getISOWeek(date) {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        }
+
+        function updateClockBundeslandDisplay() {
+            const currentBL = getBundesland();
+            const fullName = bundeslaenderNamen[currentBL] || currentBL;
+            const blDisplay = document.getElementById("clock-bl-name");
+            if (blDisplay) blDisplay.innerText = fullName;
+        }
+
+        function setBundesland(bl) {
+            localStorage.setItem("selectedBundesland", bl);
+            const blSelect = document.getElementById('bl-select');
+            if (blSelect) blSelect.value = bl;
+            updateClockBundeslandDisplay();
+        }
+
+        function getFerienForDate(dateKey) {
+            const bl = getBundesland();
+            const ranges = schulferienData2026[bl];
+            if (!ranges) return null;
+            return ranges.find(r => dateKey >= r.s && dateKey <= r.e) || null;
+        }
+
+        function formatDateDe(isoStr) {
+            if (!isoStr) return "";
+            const parts = isoStr.split('-');
+            return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+
+        function getFerienEnabled() { return localStorage.getItem("ferien_enabled") !== "false"; }
+        function setFerienEnabled(state) { localStorage.setItem("ferien_enabled", state); }
+
+        function openSettingsModal() {
+            document.getElementById("ferienToggle").checked = getFerienEnabled();
+            document.getElementById("bl-select").value = getBundesland();
+            document.getElementById("settings-modal").style.display = "flex";
+        }
+
+        function closeSettingsModal() { document.getElementById("settings-modal").style.display = "none"; }
+
+        function toggleFerien(state) {
+            setFerienEnabled(state);
+            updateEventsUI();
+            if (document.getElementById('page-calendar').classList.contains('active')) renderCalendar();
+        }
+
+        function getBundesland() { return localStorage.getItem("selectedBundesland") || "BE"; }
+
+        function getEasterSunday(year) {
+            const f = Math.floor, a = year % 19, b = f(year / 100), c = year % 100,
+                d = f(b / 4), e = b % 4, g = f((8 * b + 13) / 25), h = (19 * a + b - d - g + 15) % 30,
+                i = f(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7,
+                m = f((a + 11 * h + 22 * l) / 451), month = f((h + l - 7 * m + 114) / 31),
+                day = ((h + l - 7 * m + 114) % 31) + 1;
+            return new Date(year, month - 1, day);
+        }
+
+        function formatDateISO(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, "0");
+            const d = String(date.getDate()).padStart(2, "0");
+            return `${y}-${m}-${d}`;
+        }
+
+        function generateBaseHolidays(year) {
+            const easter = getEasterSunday(year);
+            return [
+                { date: `${year}-01-01`, name: "Neujahr" },
+                { date: `${year}-05-01`, name: "Tag der Arbeit" },
+                { date: `${year}-10-03`, name: "Tag der Deutschen Einheit" },
+                { date: `${year}-12-25`, name: "1. Weihnachtstag" },
+                { date: `${year}-12-26`, name: "2. Weihnachtstag" },
+                { date: formatDateISO(new Date(easter.getTime() - 2 * 86400000)), name: "Karfreitag" },
+                { date: formatDateISO(easter), name: "Ostersonntag" },
+                { date: formatDateISO(new Date(easter.getTime() + 1 * 86400000)), name: "Ostermontag" },
+                { date: formatDateISO(new Date(easter.getTime() + 39 * 86400000)), name: "Christi Himmelfahrt" },
+                { date: formatDateISO(new Date(easter.getTime() + 49 * 86400000)), name: "Pfingstsonntag" },
+                { date: formatDateISO(new Date(easter.getTime() + 50 * 86400000)), name: "Pfingstmontag" }
+            ];
+        }
+
+        function getExtraHolidaysForBL(bl, year) {
+            const easter = getEasterSunday(year);
+            const extras = {
+                BW: [{ date: `${year}-01-06`, name: "Heilige Drei Könige" }, { date: formatDateISO(new Date(easter.getTime() + 60 * 86400000)), name: "Fronleichnam" }, { date: `${year}-11-01`, name: "Allerheiligen" }],
+                BY: [{ date: `${year}-01-06`, name: "Heilige Drei Könige" }, { date: formatDateISO(new Date(easter.getTime() + 60 * 86400000)), name: "Fronleichnam" }, { date: `${year}-08-15`, name: "Mariä Himmelfahrt" }, { date: `${year}-11-01`, name: "Allerheiligen" }],
+                HE: [{ date: formatDateISO(new Date(easter.getTime() + 60 * 86400000)), name: "Fronleichnam" }],
+                NW: [{ date: formatDateISO(new Date(easter.getTime() + 60 * 86400000)), name: "Fronleichnam" }, { date: `${year}-11-01`, name: "Allerheiligen" }],
+                RP: [{ date: formatDateISO(new Date(easter.getTime() + 60 * 86400000)), name: "Fronleichnam" }, { date: `${year}-11-01`, name: "Allerheiligen" }],
+                SL: [{ date: formatDateISO(new Date(easter.getTime() + 60 * 86400000)), name: "Fronleichnam" }, { date: `${year}-08-15`, name: "Mariä Himmelfahrt" }, { date: `${year}-11-01`, name: "Allerheiligen" }],
+                SN: [{ date: `${year}-10-31`, name: "Reformationstag" }, { date: `${year}-11-18`, name: "Buß- und Bettag" }],
+                ST: [{ date: `${year}-01-06`, name: "Heilige Drei Könige" }, { date: `${year}-10-31`, name: "Reformationstag" }],
+                TH: [{ date: `${year}-09-20`, name: "Weltkindertag" }, { date: `${year}-10-31`, name: "Reformationstag" }],
+                NI: [{ date: `${year}-10-31`, name: "Reformationstag" }], HB: [{ date: `${year}-10-31`, name: "Reformationstag" }],
+                HH: [{ date: `${year}-10-31`, name: "Reformationstag" }], SH: [{ date: `${year}-10-31`, name: "Reformationstag" }],
+                BE: [{ date: `${year}-03-08`, name: "Internationaler Frauentag" }], BB: [{ date: `${year}-10-31`, name: "Reformationstag" }],
+                MV: [{ date: `${year}-03-08`, name: "Internationaler Frauentag" }, { date: `${year}-10-31`, name: "Reformationstag" }]
+            };
+            return extras[bl] || [];
+        }
+
+        function getHolidaysForYear(year) {
+            const bl = getBundesland();
+            const all = [...generateBaseHolidays(year), ...getExtraHolidaysForBL(bl, year)];
+            all.sort((a, b) => a.date.localeCompare(b.date));
+            return all;
+        }
+
+        function getHolidayThemeClass(name) {
+            const n = name.toLowerCase();
+            if (n.includes("oster") || n.includes("karfreitag") || n.includes("pfingst") || n.includes("himmelfahrt")) return "ft-theme-ostern";
+            if (n.includes("weihnacht")) return "ft-theme-weihnachten";
+            if (n.includes("neujahr")) return "ft-theme-neujahr";
+            if (n.includes("arbeit") || n.includes("mai")) return "ft-theme-mai";
+            if (n.includes("einheit")) return "ft-theme-einheit";
+            if (n.includes("frauentag")) return "ft-theme-frauentag";
+            if (n.includes("reformation") || n.includes("allerheiligen") || n.includes("buss")) return "ft-theme-herbst";
+            return "ft-theme-default";
+        }
+
+        function getDaysUntil(isoDateStr) {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const target = new Date(isoDateStr + "T00:00:00");
+            return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+        }
+
+        function changeBundesland(bl) {
+            setBundesland(bl);
+            updateEventsUI();
+            if (document.getElementById('page-calendar').classList.contains('active')) renderCalendar();
+        }
+
+        function openFeiertageModal() {
+            const container = document.getElementById('feiertage-modal-list');
+            container.innerHTML = '';
+            const holidays = getHolidaysForYear(new Date().getFullYear());
+
+            holidays.forEach(h => {
+                const days = getDaysUntil(h.date);
+                const themeClass = getHolidayThemeClass(h.name);
+                const formattedDate = new Date(h.date + "T00:00:00").toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+                const item = document.createElement('div');
+                item.className = `event-item ${themeClass}`;
+                let statusText = days < 0 ? "Vorbei" : days === 0 ? "Heute" : days === 1 ? "Morgen" : `in ${days} Tagen`;
+
+                item.innerHTML = `
+                    <div class="event-item-details">
+                        <span class="event-item-title">🎉 ${h.name}</span>
+                        <span class="event-item-time">${formattedDate}</span>
+                    </div>
+                    <span style="font-size: 0.8rem; font-weight: bold;">${statusText}</span>
+                `;
+                container.appendChild(item);
+            });
+
+            document.getElementById('feiertage-modal').style.display = 'flex';
+        }
+
+        function closeFeiertageModal() { document.getElementById('feiertage-modal').style.display = 'none'; }
+
+        function openFerienModal() {
+            const container = document.getElementById('ferien-modal-list');
+            container.innerHTML = '';
+            const list = schulferienData2026[getBundesland()] || [];
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            list.forEach(f => {
+                const daysUntilStart = getDaysUntil(f.s);
+                const daysUntilEnd = getDaysUntil(f.e);
+                let statusText = (todayStr >= f.s && todayStr <= f.e) ? `🔥 Läuft (noch ${daysUntilEnd} Tage)` : daysUntilEnd < 0 ? "Vorbei" : `in ${daysUntilStart} Tagen`;
+
+                const item = document.createElement('div');
+                item.className = `event-item ft-theme-ferien`;
+                item.innerHTML = `
+                    <div class="event-item-details">
+                        <span class="event-item-title">🌴 ${f.name}</span>
+                        <span class="event-item-time" style="color: #86efac;">${formatDateDe(f.s)} bis ${formatDateDe(f.e)}</span>
+                    </div>
+                    <span style="font-size: 0.8rem; font-weight: bold; color: #86efac;">${statusText}</span>
+                `;
+                container.appendChild(item);
+            });
+
+            document.getElementById('ferien-modal').style.display = 'flex';
+        }
+
+        function closeFerienModal() { document.getElementById('ferien-modal').style.display = 'none'; }
+
+        function toggleUntilField() {
+            const val = document.getElementById('event-rrule').value;
+            document.getElementById('until-group').style.display = (val !== 'NONE') ? 'flex' : 'none';
+            document.getElementById('custom-interval-group').style.display = (val === 'CUSTOM_DAYS') ? 'flex' : 'none';
+        }
+
+        /* --- STEUERUNG FÜR MEHRTÄGIG / URLAUB --- */
+        function toggleRangeFields() {
+            const isRange = document.getElementById('event-is-range').checked;
+            const rangeContainer = document.getElementById('range-fields-container');
+            const labelStartDate = document.getElementById('label-start-date');
+            const labelStartTime = document.getElementById('label-start-time');
+
+            if (isRange) {
+                rangeContainer.style.display = 'flex';
+                labelStartDate.innerText = 'Startdatum';
+                labelStartTime.innerText = 'Startzeit';
+            } else {
+                rangeContainer.style.display = 'none';
+                labelStartDate.innerText = 'Datum';
+                labelStartTime.innerText = 'Uhrzeit';
+            }
+        }
+
+        // --- TERMINE FÜR EIN DATUM HOLEN ---
+        function getEventsForDate(dateStr) {
+            const target = new Date(dateStr + "T00:00:00");
+            let result = [];
+
+            const holidays = getHolidaysForYear(target.getFullYear());
+            const holiday = holidays.find(h => h.date === dateStr);
+            if (holiday) {
+                result.push({
+                    id: 'ft_' + holiday.date,
+                    title: holiday.name,
+                    isFeiertag: true,
+                    start: 'Ganztägig',
+                    end: '',
+                    themeClass: getHolidayThemeClass(holiday.name)
+                });
+            }
+
+            const activeEvents = rawEvents.filter(ev => !ev.deleted);
+
+            activeEvents.forEach(ev => {
+                if (ev.exdates && ev.exdates.includes(dateStr)) return;
+
+                const startDate = new Date(ev.startDate + "T00:00:00");
+                const endDate = new Date((ev.endDate || ev.startDate) + "T00:00:00");
+                const untilDate = ev.untilDate ? new Date(ev.untilDate + "T23:59:59") : null;
+
+                if (untilDate && target > untilDate) return;
+
+                let isMatch = false;
+
+                if (ev.rrule === "NONE") {
+                    if (target >= startDate && target <= endDate) isMatch = true;
+                } else if (target >= startDate) {
+                    if (ev.rrule === "DAILY") {
+                        isMatch = true;
+                    } else if (ev.rrule === "CUSTOM_DAYS") {
+                        const interval = parseInt(ev.intervalDays) || 1;
+                        const diffDays = Math.floor((Date.UTC(target.getFullYear(), target.getMonth(), target.getDate()) - Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())) / 86400000);
+                        if (diffDays >= 0 && diffDays % interval === 0) isMatch = true;
+                    } else if (ev.rrule === "WEEKLY") {
+                        const diffDays = Math.floor((Date.UTC(target.getFullYear(), target.getMonth(), target.getDate()) - Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())) / 86400000);
+                        if (diffDays >= 0 && diffDays % 7 === 0) isMatch = true;
+                    } else if (ev.rrule === "MONTHLY") {
+                        if (target.getDate() === startDate.getDate()) isMatch = true;
+                    } else if (ev.rrule === "YEARLY") {
+                        if (target.getMonth() === startDate.getMonth() && target.getDate() === startDate.getDate()) isMatch = true;
+                    }
+                }
+
+                if (isMatch) {
+                    result.push({ ...ev, instanceDate: dateStr });
+                }
+            });
+
+            return result;
+        }
+
+        function switchPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+
+            document.getElementById(`page-${page}`).classList.add('active');
+            document.getElementById(`nav-${page}`).classList.add('active');
+            
+            if(page === 'calendar') renderCalendar();
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('de-DE');
+            document.getElementById('clock-date').innerText = now.toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+            if (now.getMinutes() !== currentMinuteTracker) {
+                currentMinuteTracker = now.getMinutes();
+                updateEventsUI();
+                if (document.getElementById('page-calendar').classList.contains('active')) renderCalendar();
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function markDueEventDone() {
+            if (dueEventsStack.length === 0) return;
+            const topEv = dueEventsStack[0];
+            const uniqueKey = `${topEv.date}_${topEv.start}_${topEv.id}`;
+
+            completedEvents[uniqueKey] = true;
+            localStorage.setItem('pwa_events_completed', JSON.stringify(completedEvents));
+
+            updateEventsUI();
+            if (document.getElementById('page-calendar').classList.contains('active')) renderCalendar();
+        }
+
+        function updateEventsUI() {
+            const currentBL = getBundesland();
+            document.getElementById('widget-bl-badge').innerText = currentBL;
+            document.getElementById('widget-ferien-bl-badge').innerText = currentBL;
+
+            const currentYear = new Date().getFullYear();
+            let holidays = getHolidaysForYear(currentYear);
+            let nextHoliday = holidays.find(h => getDaysUntil(h.date) >= 0) || getHolidaysForYear(currentYear + 1).find(h => getDaysUntil(h.date) >= 0);
+
+            if (nextHoliday) {
+                const days = getDaysUntil(nextHoliday.date);
+                const widget = document.getElementById('feiertag-widget');
+                widget.className = `card accent-feiertag ${getHolidayThemeClass(nextHoliday.name)}`;
+                const formattedDate = new Date(nextHoliday.date + "T00:00:00").toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+                document.getElementById('widget-feiertag-name').innerText = nextHoliday.name;
+                document.getElementById('widget-feiertag-date').innerText = `${formattedDate} (${days === 0 ? 'Heute' : days === 1 ? 'Morgen' : 'in ' + days + ' Tagen'})`;
+            }
+
+            const now = new Date();
+            const todayStr = formatDateISO(now);
+            const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            const ferienList = schulferienData2026[currentBL] || [];
+            let currentFerien = ferienList.find(f => todayStr >= f.s && todayStr <= f.e);
+            let nextFerien = ferienList.find(f => f.s > todayStr);
+
+            const ferienTitleEl = document.getElementById('widget-ferien-name');
+            const ferienSubEl = document.getElementById('widget-ferien-date');
+
+            if (currentFerien) {
+                ferienTitleEl.innerText = `🌴 ${currentFerien.name} (Aktiv)`;
+                ferienSubEl.innerText = `${formatDateDe(currentFerien.s)} - ${formatDateDe(currentFerien.e)} (noch ${getDaysUntil(currentFerien.e)} Tage)`;
+            } else if (nextFerien) {
+                ferienTitleEl.innerText = `🌴 ${nextFerien.name}`;
+                ferienSubEl.innerText = `${formatDateDe(nextFerien.s)} - ${formatDateDe(nextFerien.e)} (in ${getDaysUntil(nextFerien.s)} Tagen)`;
+            } else {
+                ferienTitleEl.innerText = "Keine nächsten Ferien";
+                ferienSubEl.innerText = "-";
+            }
+
+            let allUpcomingList = [];
+            let dueList = [];
+            let checkDate = new Date();
+
+            for (let i = 0; i < 365; i++) {
+                const dateStr = formatDateISO(checkDate);
+                const dayEvents = getEventsForDate(dateStr);
+
+                dayEvents.forEach(ev => {
+                    const uniqueKey = `${dateStr}_${ev.start}_${ev.id}`;
+                    if (completedEvents[uniqueKey]) return;
+
+                    const evData = { ...ev, date: dateStr };
+                    if (!ev.isFeiertag && (dateStr < todayStr || (dateStr === todayStr && ev.start <= currentTimeStr))) {
+                        dueList.push(evData);
+                    }
+                    allUpcomingList.push(evData);
+                });
+                checkDate.setDate(checkDate.getDate() + 1);
+            }
+
+            dueEventsStack = dueList;
+            const dueWrapper = document.getElementById('due-stack-wrapper');
+            if (dueList.length > 0) {
+                const topDue = dueList[0];
+                document.getElementById('due-stack-count').innerText = `⏰ FÄLLIGES EREIGNIS (1 von ${dueList.length})`;
+                document.getElementById('due-stack-title').innerText = (topDue.rrule === 'YEARLY' ? '🎂 ' : '') + topDue.title;
+                document.getElementById('due-stack-sub').innerText = `Fällig um ${topDue.start} Uhr`;
+                dueWrapper.style.display = 'block';
+            } else {
+                dueWrapper.style.display = 'none';
+            }
+
+            const futureUserEvents = allUpcomingList.filter(e => !e.isFeiertag);
+            if (futureUserEvents.length > 0) {
+                const next = futureUserEvents[0];
+                const dateObj = new Date(next.date + "T00:00:00");
+                const formattedDate = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const diffDays = Math.round((dateObj - new Date(todayStr + "T00:00:00")) / (1000 * 60 * 60 * 24));
+                let countdownText = diffDays === 0 ? "(heute)" : diffDays === 1 ? "(morgen)" : `(in ${diffDays} Tagen)`;
+
+                document.getElementById('next-event-title').innerText = (next.rrule === 'YEARLY' ? '🎂 ' : '') + next.title;
+                document.getElementById('next-event-date').innerText = `${formattedDate} (${next.start} Uhr) ${countdownText}`;
+            } else {
+                document.getElementById('next-event-title').innerText = "Keine Ereignisse";
+                document.getElementById('next-event-date').innerText = "-";
+            }
+
+            const listContainer = document.getElementById('all-events-list');
+            listContainer.innerHTML = '';
+            allUpcomingList.slice(0, 12).forEach(ev => {
+                const item = document.createElement('div');
+                item.className = 'event-item ' + (ev.isFeiertag ? ev.themeClass : '');
+                
+                let timeDisplayText = ev.isFeiertag ? 'Feiertag' : '⏰ ' + ev.start;
+                if (ev.end && ev.end !== ev.start) {
+                    timeDisplayText += ' - ' + ev.end + ' Uhr';
+                } else if (!ev.isFeiertag) {
+                    timeDisplayText += ' Uhr';
+                }
+
+                item.innerHTML = `
+                    <div class="event-item-details">
+                        <span class="event-item-title">${ev.isFeiertag ? '🎉 ' : (ev.rrule === 'YEARLY' ? '🎂 ' : '')}${ev.title}</span>
+                        <span class="event-item-time">${timeDisplayText}</span>
+                    </div>
+                    <span style="font-size: 0.8rem; opacity: 0.7;">${new Date(ev.date + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        // --- RENDER KALENDER (MIT KALENDERWOCHEN KW) ---
+        function renderCalendar() {
+            const daysContainer = document.getElementById('calendar-days');
+            if (!daysContainer) return;
+            daysContainer.innerHTML = '';
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            const monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+            document.getElementById('calendar-month-year').innerText = `${monthNames[month]} ${year}`;
+
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            let offset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+            const todayFormatted = formatDateISO(new Date());
+            const ferienAktiv = getFerienEnabled();
+
+            let currentDay = 1;
+            let finishedMonth = false;
+
+            while (!finishedMonth) {
+                const sampleDate = new Date(year, month, currentDay <= daysInMonth ? currentDay : daysInMonth);
+                const kwNum = getISOWeek(sampleDate);
+
+                const kwCell = document.createElement('div');
+                kwCell.className = 'kw-cell';
+                kwCell.innerText = kwNum;
+                daysContainer.appendChild(kwCell);
+
+                for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+                    if ((currentDay === 1 && dayOfWeek < offset) || currentDay > daysInMonth) {
+                        daysContainer.appendChild(document.createElement('div'));
+                    } else {
+                        const cell = document.createElement('div');
+                        cell.classList.add('day-cell');
+
+                        const monthStr = String(month + 1).padStart(2, '0');
+                        const dayStr = String(currentDay).padStart(2, '0');
+                        const dateKey = `${year}-${monthStr}-${dayStr}`;
+
+                        if (dateKey === todayFormatted) cell.classList.add('today');
+
+                        const ferienObj = ferienAktiv ? getFerienForDate(dateKey) : null;
+                        if (ferienObj) cell.classList.add('is-ferien');
+
+                        const numEl = document.createElement('div');
+                        numEl.classList.add('day-number');
+                        numEl.innerText = currentDay;
+                        cell.appendChild(numEl);
+
+                        const eventsContainer = document.createElement('div');
+                        eventsContainer.classList.add('day-events-container');
+
+                        if (ferienObj) {
+                            const ferienMini = document.createElement('div');
+                            ferienMini.classList.add('mini-event-card', 'ferien-card');
+                            ferienMini.innerText = `🌴 ${ferienObj.name}`;
+                            eventsContainer.appendChild(ferienMini);
+                        }
+
+                        const dayEvents = getEventsForDate(dateKey);
+                        if (dayEvents.length > 0) {
+                            cell.classList.add('has-event');
+                            dayEvents.forEach(ev => {
+                                const mini = document.createElement('div');
+                                mini.classList.add('mini-event-card');
+                                if (ev.isFeiertag) {
+                                    mini.classList.add('feiertag-card', ev.themeClass);
+                                    mini.innerHTML = `🎉 ${ev.title}`;
+                                } else {
+                                    if (ev.rrule !== 'NONE') mini.classList.add('recurring');
+                                    mini.innerHTML = `<span class="mini-event-time">${ev.start}</span>${ev.rrule === 'YEARLY' ? '🎂 ' : ''}${ev.title}`;
+                                }
+                                eventsContainer.appendChild(mini);
+                            });
+                        }
+
+                        cell.appendChild(eventsContainer);
+                        const targetDateStr = dateKey;
+                        cell.onclick = () => openModal(targetDateStr);
+                        daysContainer.appendChild(cell);
+
+                        currentDay++;
+                    }
+                }
+
+                if (currentDay > daysInMonth) finishedMonth = true;
+            }
+        }
+
+        function changeMonth(dir) {
+            currentDate.setMonth(currentDate.getMonth() + dir);
+            renderCalendar();
+        }
+
+        function goToToday() {
+            currentDate = new Date();
+            renderCalendar();
+        }
+
+        // --- MODAL & BEARBEITEN LOGIK ---
+        function openModal(dateStr) {
+            selectedDateStr = dateStr;
+            editingEventId = null;
+
+            const parts = dateStr.split('-');
+            document.getElementById('modal-date-display').innerText = `Ereignis am ${parts[2]}.${parts[1]}.${parts[0]}`;
+            
+            document.getElementById('event-title-input').value = '';
+            document.getElementById('event-start-date').value = dateStr;
+            document.getElementById('event-end-date').value = dateStr;
+            document.getElementById('event-start-time').value = '09:00';
+            document.getElementById('event-end-time').value = '10:00';
+            
+            document.getElementById('event-is-range').checked = false;
+            toggleRangeFields();
+
+            document.getElementById('event-rrule').value = 'NONE';
+            document.getElementById('event-interval-days').value = 2;
+            document.getElementById('event-until-date').value = '';
+
+            toggleUntilField();
+            renderModalExistingEvents(dateStr);
+            document.getElementById('event-modal').style.display = 'flex';
+        }
+
+        function editEvent(id) {
+            const ev = rawEvents.find(e => e.id === id);
+            if (!ev) return;
+
+            editingEventId = ev.id;
+            document.getElementById('event-title-input').value = ev.title;
+            document.getElementById('event-start-date').value = ev.startDate;
+            document.getElementById('event-end-date').value = ev.endDate || ev.startDate;
+            document.getElementById('event-start-time').value = ev.start;
+            document.getElementById('event-end-time').value = ev.end;
+            
+            const isRange = !!(ev.endDate && ev.endDate !== ev.startDate);
+            document.getElementById('event-is-range').checked = isRange;
+            toggleRangeFields();
+
+            document.getElementById('event-rrule').value = ev.rrule || 'NONE';
+            document.getElementById('event-interval-days').value = ev.intervalDays || 2;
+            document.getElementById('event-until-date').value = ev.untilDate || '';
+
+            toggleUntilField();
+            document.getElementById('modal-date-display').innerText = `Termin bearbeiten`;
+        }
+
+        function closeModal() { document.getElementById('event-modal').style.display = 'none'; }
+
+        function saveEvent() {
+            const title = document.getElementById('event-title-input').value.trim();
+            const startDate = document.getElementById('event-start-date').value;
+            let start = document.getElementById('event-start-time').value;
+            
+            const isRange = document.getElementById('event-is-range').checked;
+            const endDate = isRange ? document.getElementById('event-end-date').value : startDate;
+            let end = isRange ? document.getElementById('event-end-time').value : start;
+
+            const rrule = document.getElementById('event-rrule').value;
+            const intervalDays = document.getElementById('event-interval-days').value;
+            const untilDate = document.getElementById('event-until-date').value;
+
+            if (!title || !startDate) return;
+            if (startDate === (endDate || startDate) && end < start) end = start;
+
+            if (editingEventId) {
+                const index = rawEvents.findIndex(e => e.id === editingEventId);
+                if (index !== -1) {
+                    rawEvents[index] = {
+                        ...rawEvents[index],
+                        title: title,
+                        startDate: startDate,
+                        endDate: endDate || startDate,
+                        start: start,
+                        end: end,
+                        rrule: rrule,
+                        intervalDays: rrule === 'CUSTOM_DAYS' ? parseInt(intervalDays) : 1,
+                        untilDate: rrule !== 'NONE' ? untilDate : '',
+                        sequence: (rawEvents[index].sequence || 0) + 1,
+                        updatedAt: new Date().toISOString()
+                    };
+                }
+            } else {
+                rawEvents.push({
+                    id: 'ev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                    title: title,
+                    startDate: startDate,
+                    endDate: endDate || startDate,
+                    start: start,
+                    end: end,
+                    rrule: rrule,
+                    intervalDays: rrule === 'CUSTOM_DAYS' ? parseInt(intervalDays) : 1,
+                    untilDate: rrule !== 'NONE' ? untilDate : '',
+                    deleted: false,
+                    exdates: [],
+                    sequence: 0,
+                    updatedAt: new Date().toISOString()
+                });
+            }
+
+            localStorage.setItem('pwa_events_ical_final', JSON.stringify(rawEvents));
+            editingEventId = null;
+            closeModal();
+            renderCalendar();
+            updateEventsUI();
+        }
+
+        // --- INTELLIGENTES LÖSCHEN (EXDATE vs. SERIE) ---
+        function initiateDeleteEvent(id, dateStr) {
+            const ev = rawEvents.find(e => e.id === id);
+            if (!ev) return;
+
+            if (ev.rrule && ev.rrule !== 'NONE') {
+                pendingDeleteInfo = { id, dateStr };
+                document.getElementById('delete-choice-modal').style.display = 'flex';
+            } else {
+                confirmDeleteSeries(id);
+            }
+        }
+
+        function closeDeleteChoiceModal() {
+            pendingDeleteInfo = null;
+            document.getElementById('delete-choice-modal').style.display = 'none';
+        }
+
+        function confirmDeleteInstance() {
+            if (!pendingDeleteInfo) return;
+            const { id, dateStr } = pendingDeleteInfo;
+            const index = rawEvents.findIndex(e => e.id === id);
+
+            if (index !== -1) {
+                if (!rawEvents[index].exdates) rawEvents[index].exdates = [];
+                if (!rawEvents[index].exdates.includes(dateStr)) {
+                    rawEvents[index].exdates.push(dateStr);
+                }
+                rawEvents[index].sequence = (rawEvents[index].sequence || 0) + 1;
+                rawEvents[index].updatedAt = new Date().toISOString();
+                localStorage.setItem('pwa_events_ical_final', JSON.stringify(rawEvents));
+            }
+
+            closeDeleteChoiceModal();
+            renderModalExistingEvents(selectedDateStr);
+            renderCalendar();
+            updateEventsUI();
+        }
+
+        function confirmDeleteSeries(targetId) {
+            const id = targetId || (pendingDeleteInfo ? pendingDeleteInfo.id : null);
+            if (!id) return;
+
+            const index = rawEvents.findIndex(e => e.id === id);
+            if (index !== -1) {
+                rawEvents[index].deleted = true;
+                rawEvents[index].sequence = (rawEvents[index].sequence || 0) + 1;
+                rawEvents[index].updatedAt = new Date().toISOString();
+                localStorage.setItem('pwa_events_ical_final', JSON.stringify(rawEvents));
+            }
+
+            closeDeleteChoiceModal();
+            renderModalExistingEvents(selectedDateStr);
+            renderCalendar();
+            updateEventsUI();
+        }
+
+        function renderModalExistingEvents(dateStr) {
+            const container = document.getElementById('modal-existing-events');
+            container.innerHTML = '';
+
+            const dayEvents = getEventsForDate(dateStr).filter(e => !e.isFeiertag);
+            if (dayEvents.length > 0) {
+                const label = document.createElement('div');
+                label.style.fontSize = '0.75rem';
+                label.style.color = 'rgba(255,255,255,0.6)';
+                label.style.fontWeight = 'bold';
+                label.style.textTransform = 'uppercase';
+                label.innerText = 'Bestehende Termine an diesem Tag:';
+                container.appendChild(label);
+
+                dayEvents.forEach(ev => {
+                    const row = document.createElement('div');
+                    row.className = 'existing-event-item';
+                    let timeStr = ev.start;
+                    if (ev.end && ev.end !== ev.start) timeStr += ` - ${ev.end}`;
+                    
+                    row.innerHTML = `
+                        <span><strong>${timeStr}</strong> | ${ev.title}</span>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-action" style="padding:4px 8px; font-size:0.75rem;" onclick="editEvent('${ev.id}')">✏️</button>
+                            <button class="btn-delete-small" onclick="initiateDeleteEvent('${ev.id}', '${dateStr}')">🗑️</button>
+                        </div>
+                    `;
+                    container.appendChild(row);
+                });
+            }
+        }
+
+        // --- iCAL EXPORT & IMPORT (RFC 5545) ---
+        function exportICal() {
+            let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//PWA Calendar Pro Feiertage//DE\nCALSCALE:GREGORIAN\n";
+
+            rawEvents.forEach(ev => {
+                const cleanStartDate = ev.startDate.replace(/-/g, '');
+                const cleanEndDate = (ev.endDate || ev.startDate).replace(/-/g, '');
+                const cleanStart = ev.start.replace(':', '') + '00';
+                const cleanEnd = ev.end.replace(':', '') + '00';
+                const uid = ev.id;
+                const dtstamp = new Date(ev.updatedAt || Date.now()).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+                icsContent += "BEGIN:VEVENT\n";
+                icsContent += `UID:${uid}\n`;
+                icsContent += `DTSTAMP:${dtstamp}\n`;
+                icsContent += `SEQUENCE:${ev.sequence || 0}\n`;
+                icsContent += ev.deleted ? "STATUS:CANCELLED\n" : "STATUS:CONFIRMED\n";
+                icsContent += `SUMMARY:${ev.title}\n`;
+                icsContent += `DTSTART:${cleanStartDate}T${cleanStart}\n`;
+                icsContent += `DTEND:${cleanEndDate}T${cleanEnd}\n`;
+                
+                if (ev.rrule && ev.rrule !== 'NONE') {
+                    let rruleStr = ev.rrule === 'CUSTOM_DAYS' ? `RRULE:FREQ=DAILY;INTERVAL=${ev.intervalDays || 1}` : `RRULE:FREQ=${ev.rrule}`;
+                    if (ev.untilDate) rruleStr += `;UNTIL=${ev.untilDate.replace(/-/g, '')}T235959Z`;
+                    icsContent += `${rruleStr}\n`;
+                }
+
+                if (ev.exdates && ev.exdates.length > 0) {
+                    ev.exdates.forEach(exDate => {
+                        icsContent += `EXDATE:${exDate.replace(/-/g, '')}T${cleanStart}\n`;
+                    });
+                }
+                
+                icsContent += "END:VEVENT\n";
+            });
+
+            icsContent += "END:VCALENDAR";
+
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'kalender_feiertage.ics';
+            link.click();
+        }
+
+        function importICal(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const content = event.target.result;
+                const vevents = content.split("BEGIN:VEVENT");
+                let count = 0;
+
+                vevents.forEach((block, idx) => {
+                    if (idx === 0) return;
+
+                    const getVal = (key) => {
+                        const m = block.match(new RegExp(`${key}:(.*)`));
+                        return m ? m[1].trim() : null;
+                    };
+
+                    const summary = getVal("SUMMARY");
+                    const dtstart = getVal("DTSTART");
+                    const dtend = getVal("DTEND");
+                    const uid = getVal("UID") || ('ev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+                    const status = getVal("STATUS");
+
+                    if (summary && dtstart) {
+                        const startDate = `${dtstart.substr(0,4)}-${dtstart.substr(4,2)}-${dtstart.substr(6,2)}`;
+                        const startTime = dtstart.includes("T") ? `${dtstart.substr(9,2)}:${dtstart.substr(11,2)}` : "09:00";
+                        let endDate = startDate;
+                        let endTime = "10:00";
+
+                        if (dtend) {
+                            endDate = `${dtend.substr(0,4)}-${dtend.substr(4,2)}-${dtend.substr(6,2)}`;
+                            endTime = dtend.includes("T") ? `${dtend.substr(9,2)}:${dtend.substr(11,2)}` : "10:00";
+                        }
+
+                        const existingIdx = rawEvents.findIndex(ev => ev.id === uid);
+                        const eventObj = {
+                            id: uid,
+                            title: summary,
+                            startDate: startDate,
+                            endDate: endDate,
+                            start: startTime,
+                            end: endTime,
+                            rrule: "NONE",
+                            deleted: status === "CANCELLED",
+                            exdates: [],
+                            sequence: 0,
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        if (existingIdx !== -1) rawEvents[existingIdx] = eventObj;
+                        else rawEvents.push(eventObj);
+                        count++;
+                    }
+                });
+
+                localStorage.setItem('pwa_events_ical_final', JSON.stringify(rawEvents));
+                alert(`${count} Termine erfolgreich synchronisiert!`);
+                renderCalendar();
+                updateEventsUI();
+            };
+            reader.readAsText(file);
+        }
+
+        function requestNotificationPermission() {
+            if ("Notification" in window) {
+                Notification.requestPermission().then(p => {
+                    alert(p === 'granted' ? "Benachrichtigungen aktiviert!" : "Benachrichtigungen nicht erlaubt.");
+                });
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            setBundesland(getBundesland());
+            updateEventsUI();
+        });
+
+        // SWIPE HANDLING
+        let touchStartX = 0, touchStartY = 0, currentDeltaX = 0, isDragging = false;
+        const calendarElement = document.getElementById('page-calendar');
+
+        if (calendarElement) {
+            calendarElement.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                currentDeltaX = 0;
+                isDragging = true;
+                calendarElement.style.transition = 'none';
+            }, { passive: true });
+
+            calendarElement.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                const deltaX = e.touches[0].clientX - touchStartX;
+                const deltaY = e.touches[0].clientY - touchStartY;
+
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    currentDeltaX = deltaX;
+                    calendarElement.style.transform = `translateX(${deltaX}px)`;
+                }
+            }, { passive: true });
+
+            calendarElement.addEventListener('touchend', () => {
+                if (!isDragging) return;
+                isDragging = false;
+                const minSwipeDistance = 80;
+                const animationDuration = 250;
+
+                calendarElement.style.transition = `transform ${animationDuration}ms ease-out`;
+
+                if (Math.abs(currentDeltaX) > minSwipeDistance) {
+                    const direction = currentDeltaX < 0 ? 1 : -1;
+                    const targetX = direction === 1 ? -window.innerWidth : window.innerWidth;
+                    calendarElement.style.transform = `translateX(${targetX}px)`;
+
+                    setTimeout(() => {
+                        calendarElement.style.transition = 'none';
+                        calendarElement.style.transform = 'translateX(0)';
+                        changeMonth(direction);
+                        void calendarElement.offsetWidth;
+                    }, animationDuration);
+                } else {
+                    calendarElement.style.transform = 'translateX(0)';
+                }
+            });
+        }
+
+        // --- SERVICE WORKER REGISTRIERUNG FÜR PWA & PLAY STORE ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker erfolgreich registriert:', reg))
+                    .catch(err => console.log('Service Worker Fehler:', err));
+            });
+        }
+    </script>
+</body>
+</html>
