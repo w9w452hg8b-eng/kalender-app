@@ -1867,7 +1867,7 @@
             });
         }
 
-        // --- SERVICE WORKER REGISTRIERUNG FÜR PWA & PLAY STORE ---
+        // --- SERVICE WORKER REGISTRIERUNG & PUSH CHECK ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
@@ -1875,13 +1875,60 @@
                     .catch(err => console.log('Service Worker Fehler:', err));
             });
         }
-        if ('Notification' in window) {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        console.log('Push-Benachrichtigungen aktiviert!');
-      }
-    });
-  }
+
+        // Benachrichtigungs-Berechtigung anfordern
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            Notification.requestPermission();
+        }
+
+        // --- AUTOMATISCHER TERMIN-PRÜFER (SCHICKT PUSH BEI FÄLLIGKEIT) ---
+        let triggeredNotifications = JSON.parse(localStorage.getItem('pwa_events_notified') || '{}');
+
+        function checkDueEventsForPush() {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+            const now = new Date();
+            const todayStr = formatDateISO(now);
+            const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            const dayEvents = getEventsForDate(todayStr);
+
+            dayEvents.forEach(ev => {
+                if (ev.isFeiertag) return;
+
+                // Schlüssel für eindeutigen Termin
+                const uniqueKey = `${todayStr}_${ev.start}_${ev.id}`;
+
+                // Wenn Termin fällig ist und noch keine Push gesendet wurde
+                if (ev.start === currentTimeStr && !triggeredNotifications[uniqueKey] && !completedEvents[uniqueKey]) {
+                    
+                    // Markieren, damit Nachricht nicht doppelt gesendet wird
+                    triggeredNotifications[uniqueKey] = true;
+                    localStorage.setItem('pwa_events_notified', JSON.stringify(triggeredNotifications));
+
+                    // System-Benachrichtigung mit dem Namen des Ereignisses senden
+                    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.ready.then(reg => {
+                            reg.showNotification((ev.rrule === 'YEARLY' ? '🎂 ' : '⏰ ') + ev.title, {
+                                body: `Jetzt fällig um ${ev.start} Uhr!`,
+                                icon: 'playstore.png',
+                                badge: 'playstore.png',
+                                vibrate: [200, 100, 200],
+                                tag: uniqueKey
+                            });
+                        });
+                    } else {
+                        new Notification((ev.rrule === 'YEARLY' ? '🎂 ' : '⏰ ') + ev.title, {
+                            body: `Jetzt fällig um ${ev.start} Uhr!`,
+                            icon: 'playstore.png'
+                        });
+                    }
+                }
+            });
+        }
+
+        // Prüfe jede Sekunde, ob ein Termin fällig ist
+        setInterval(checkDueEventsForPush, 1000);
     </script>
 </body>
 </html>
