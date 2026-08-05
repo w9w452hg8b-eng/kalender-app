@@ -1867,16 +1867,20 @@
             });
         }
 
-       // --- SERVICE WORKER & STANDBY-BENACHRICHTIGUNGEN (METHODE 2) ---
+       // --- SERVICE WORKER & STANDBY-BENACHRICHTIGUNGEN (FINALE VERSION) ---
         let swRegistration = null;
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
                     .then(reg => {
-                        swRegistration = reg;
                         console.log('Service Worker registriert:', reg);
-                        scheduleAllEventNotifications(); // Termine beim Start einplanen
+                        // Warten, bis der Service Worker sicher bereit ist
+                        return navigator.serviceWorker.ready;
+                    })
+                    .then(readyReg => {
+                        swRegistration = readyReg;
+                        scheduleAllEventNotifications(); // Sicher ausführen!
                     })
                     .catch(err => console.log('Service Worker Fehler:', err));
             });
@@ -1899,10 +1903,14 @@
         // PLANT ALLE ZUKÜNFTIGEN TERMINE BEIM BETRIEBSSYSTEM EIN
         async function scheduleAllEventNotifications() {
             if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+            // Falls swRegistration noch fehlt, aktiv darauf warten
+            if (!swRegistration && 'serviceWorker' in navigator) {
+                swRegistration = await navigator.serviceWorker.ready;
+            }
             if (!swRegistration) return;
 
             const now = new Date();
-            const todayStr = formatDateISO(now);
 
             // Gehe die nächsten 30 Tage durch und plane Anstöße ein
             for (let i = 0; i < 30; i++) {
@@ -1923,7 +1931,7 @@
                         const titleText = (ev.rrule === 'YEARLY' ? '🎂 ' : '⏰ ') + ev.title;
                         const bodyText = `Heute um ${ev.start} Uhr fällig!`;
 
-                        // 1. Variante: Wenn Android NotificationTriggers unterstützt (Web-Standard)
+                        // 1. Variante: Wenn Android NotificationTriggers unterstützt
                         if ('showTrigger' in Notification.prototype) {
                             swRegistration.showNotification(titleText, {
                                 body: bodyText,
@@ -1934,18 +1942,16 @@
                                 showTrigger: new TimestampTrigger(eventTime.getTime())
                             }).catch(() => {});
                         } else {
-                            // 2. Variante: Lokaler Timer-Delay als Fallback
+                            // 2. Variante: Lokale Nachricht an SW senden
                             setTimeout(() => {
-                                swRegistration.active && swRegistration.active.postMessage({
-                                    type: 'TRIGGER_NOTIFICATION',
-                                    title: titleText,
-                                    body: bodyText,
-                                    tag: uniqueTag
-                                });
-                                new Notification(titleText, {
-                                    body: bodyText,
-                                    icon: 'playstore.png'
-                                });
+                                if (swRegistration && swRegistration.active) {
+                                    swRegistration.active.postMessage({
+                                        type: 'TRIGGER_NOTIFICATION',
+                                        title: titleText,
+                                        body: bodyText,
+                                        tag: uniqueTag
+                                    });
+                                }
                             }, timeDiff);
                         }
                     }
