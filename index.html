@@ -1867,68 +1867,98 @@
             });
         }
 
-        // --- SERVICE WORKER REGISTRIERUNG & PUSH CHECK ---
+       // --- SERVICE WORKER & STANDBY-BENACHRICHTIGUNGEN (METHODE 2) ---
+        let swRegistration = null;
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker erfolgreich registriert:', reg))
+                    .then(reg => {
+                        swRegistration = reg;
+                        console.log('Service Worker registriert:', reg);
+                        scheduleAllEventNotifications(); // Termine beim Start einplanen
+                    })
                     .catch(err => console.log('Service Worker Fehler:', err));
             });
         }
 
-        // Benachrichtigungs-Berechtigung anfordern
-        if ('Notification' in window && Notification.permission !== 'granted') {
-            Notification.requestPermission();
+        // Benachrichtigungs-Erlaubnis abfragen
+        function requestNotificationPermission() {
+            if ("Notification" in window) {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        alert("Benachrichtigungen aktiviert!");
+                        scheduleAllEventNotifications();
+                    } else {
+                        alert("Benachrichtigungen nicht erlaubt.");
+                    }
+                });
+            }
         }
 
-        // --- AUTOMATISCHER TERMIN-PRÜFER (SCHICKT PUSH BEI FÄLLIGKEIT) ---
-        let triggeredNotifications = JSON.parse(localStorage.getItem('pwa_events_notified') || '{}');
-
-        function checkDueEventsForPush() {
+        // PLANT ALLE ZUKÜNFTIGEN TERMINE BEIM BETRIEBSSYSTEM EIN
+        async function scheduleAllEventNotifications() {
             if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            if (!swRegistration) return;
 
             const now = new Date();
             const todayStr = formatDateISO(now);
-            const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-            const dayEvents = getEventsForDate(todayStr);
+            // Gehe die nächsten 30 Tage durch und plane Anstöße ein
+            for (let i = 0; i < 30; i++) {
+                let checkDate = new Date();
+                checkDate.setDate(now.getDate() + i);
+                const dateStr = formatDateISO(checkDate);
+                const dayEvents = getEventsForDate(dateStr);
 
-            dayEvents.forEach(ev => {
-                if (ev.isFeiertag) return;
+                dayEvents.forEach(ev => {
+                    if (ev.isFeiertag) return;
 
-                // Schlüssel für eindeutigen Termin
-                const uniqueKey = `${todayStr}_${ev.start}_${ev.id}`;
+                    const eventTime = new Date(`${dateStr}T${ev.start}:00`);
+                    const timeDiff = eventTime.getTime() - now.getTime();
 
-                // Wenn Termin fällig ist und noch keine Push gesendet wurde
-                if (ev.start === currentTimeStr && !triggeredNotifications[uniqueKey] && !completedEvents[uniqueKey]) {
-                    
-                    // Markieren, damit Nachricht nicht doppelt gesendet wird
-                    triggeredNotifications[uniqueKey] = true;
-                    localStorage.setItem('pwa_events_notified', JSON.stringify(triggeredNotifications));
+                    // Nur zukünftige Termine einplanen
+                    if (timeDiff > 0) {
+                        const uniqueTag = `event_${dateStr}_${ev.start}_${ev.id}`;
+                        const titleText = (ev.rrule === 'YEARLY' ? '🎂 ' : '⏰ ') + ev.title;
+                        const bodyText = `Heute um ${ev.start} Uhr fällig!`;
 
-                    // System-Benachrichtigung mit dem Namen des Ereignisses senden
-                    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                        navigator.serviceWorker.ready.then(reg => {
-                            reg.showNotification((ev.rrule === 'YEARLY' ? '🎂 ' : '⏰ ') + ev.title, {
-                                body: `Jetzt fällig um ${ev.start} Uhr!`,
+                        // 1. Variante: Wenn Android NotificationTriggers unterstützt (Web-Standard)
+                        if ('showTrigger' in Notification.prototype) {
+                            swRegistration.showNotification(titleText, {
+                                body: bodyText,
                                 icon: 'playstore.png',
                                 badge: 'playstore.png',
                                 vibrate: [200, 100, 200],
-                                tag: uniqueKey
-                            });
-                        });
-                    } else {
-                        new Notification((ev.rrule === 'YEARLY' ? '🎂 ' : '⏰ ') + ev.title, {
-                            body: `Jetzt fällig um ${ev.start} Uhr!`,
-                            icon: 'playstore.png'
-                        });
+                                tag: uniqueTag,
+                                showTrigger: new TimestampTrigger(eventTime.getTime())
+                            }).catch(() => {});
+                        } else {
+                            // 2. Variante: Lokaler Timer-Delay als Fallback
+                            setTimeout(() => {
+                                swRegistration.active && swRegistration.active.postMessage({
+                                    type: 'TRIGGER_NOTIFICATION',
+                                    title: titleText,
+                                    body: bodyText,
+                                    tag: uniqueTag
+                                });
+                                new Notification(titleText, {
+                                    body: bodyText,
+                                    icon: 'playstore.png'
+                                });
+                            }, timeDiff);
+                        }
                     }
-                }
-            });
+                });
+            }
         }
 
-        // Prüfe jede Sekunde, ob ein Termin fällig ist
-        setInterval(checkDueEventsForPush, 1000);
+        // Automatisch nach dem Speichern eines neuen Termins aufrufen
+        const originalSaveEvent = saveEvent;
+        saveEvent = function() {
+            originalSaveEvent();
+            scheduleAllEventNotifications();
+        };
     </script>
 </body>
 </html>
