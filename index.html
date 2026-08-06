@@ -1867,52 +1867,53 @@
             });
         }
 
-       // --- SERVICE WORKER & STANDBY-BENACHRICHTIGUNGEN (FINALE VERSION) ---
-        let swRegistration = null;
+       // --- CAPACITOR NATIVE LOCAL NOTIFICATIONS (PLAY STORE BEREIT) ---
 
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => {
-                        console.log('Service Worker registriert:', reg);
-                        // Warten, bis der Service Worker sicher bereit ist
-                        return navigator.serviceWorker.ready;
-                    })
-                    .then(readyReg => {
-                        swRegistration = readyReg;
-                        scheduleAllEventNotifications(); // Sicher ausführen!
-                    })
-                    .catch(err => console.log('Service Worker Fehler:', err));
-            });
+        // Hilfsfunktion: Erzeugt aus einem String eine eindeutige Zahl-ID (Android benötigt Integer-IDs)
+        function hashCode(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = (hash << 5) - hash + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return Math.abs(hash);
         }
 
-        // Benachrichtigungs-Erlaubnis abfragen
-        function requestNotificationPermission() {
-            if ("Notification" in window) {
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') {
-                        alert("Benachrichtigungen aktiviert!");
-                        scheduleAllEventNotifications();
-                    } else {
-                        alert("Benachrichtigungen nicht erlaubt.");
-                    }
+        // Benachrichtigungs-Erlaubnis beim Betriebssystem anfragen
+        async function requestNotificationPermission() {
+            if (window.Capacitor && window.Capacitor.Plugins.LocalNotifications) {
+                const perm = await window.Capacitor.Plugins.LocalNotifications.requestPermissions();
+                if (perm.display === 'granted') {
+                    alert("Benachrichtigungen aktiviert!");
+                    scheduleAllEventNotifications();
+                } else {
+                    alert("Benachrichtigungen wurden nicht erlaubt.");
+                }
+            } else if ("Notification" in window) {
+                Notification.requestPermission().then(p => {
+                    alert(p === 'granted' ? "Browser-Benachrichtigungen aktiv!" : "Nicht erlaubt.");
                 });
             }
         }
 
-        // PLANT ALLE ZUKÜNFTIGEN TERMINE BEIM BETRIEBSSYSTEM EIN
+        // PLANT ALLE TERMINE DIREKT IM ANDROID-BETRIEBSSYSTEM EIN
         async function scheduleAllEventNotifications() {
-            if (!('Notification' in window) || Notification.permission !== 'granted') return;
-
-            // Falls swRegistration noch fehlt, aktiv darauf warten
-            if (!swRegistration && 'serviceWorker' in navigator) {
-                swRegistration = await navigator.serviceWorker.ready;
+            // Abbrechen, wenn die App im normalen Browser läuft (ohne Capacitor)
+            if (!window.Capacitor || !window.Capacitor.Plugins.LocalNotifications) {
+                console.log("Capacitor nicht erkannt (Browser-Modus).");
+                return;
             }
-            if (!swRegistration) return;
+
+            const LocalNotifications = window.Capacitor.Plugins.LocalNotifications;
+
+            // 1. Berechtigung prüfen
+            const perm = await LocalNotifications.checkPermissions();
+            if (perm.display !== 'granted') return;
 
             const now = new Date();
+            let notificationsToSchedule = [];
 
-            // Gehe die nächsten 30 Tage durch und plane Anstöße ein
+            // 2. Gehe die nächsten 30 Tage durch und sammle zukünftige Termine
             for (let i = 0; i < 30; i++) {
                 let checkDate = new Date();
                 checkDate.setDate(now.getDate() + i);
@@ -1923,43 +1924,39 @@
                     if (ev.isFeiertag) return;
 
                     const eventTime = new Date(`${dateStr}T${ev.start}:00`);
-                    const timeDiff = eventTime.getTime() - now.getTime();
 
-                    // Nur zukünftige Termine einplanen
-                    if (timeDiff > 0) {
-                        const uniqueTag = `event_${dateStr}_${ev.start}_${ev.id}`;
-                        const titleText = (ev.rrule === 'YEARLY' ? '🎂 ' : '⏰ ') + ev.title;
-                        const bodyText = `Heute um ${ev.start} Uhr fällig!`;
-
-                        // 1. Variante: Wenn Android NotificationTriggers unterstützt
-                        if ('showTrigger' in Notification.prototype) {
-                            swRegistration.showNotification(titleText, {
-                                body: bodyText,
-                                icon: 'playstore.png',
-                                badge: 'playstore.png',
-                                vibrate: [200, 100, 200],
-                                tag: uniqueTag,
-                                showTrigger: new TimestampTrigger(eventTime.getTime())
-                            }).catch(() => {});
-                        } else {
-                            // 2. Variante: Lokale Nachricht an SW senden
-                            setTimeout(() => {
-                                if (swRegistration && swRegistration.active) {
-                                    swRegistration.active.postMessage({
-                                        type: 'TRIGGER_NOTIFICATION',
-                                        title: titleText,
-                                        body: bodyText,
-                                        tag: uniqueTag
-                                    });
-                                }
-                            }, timeDiff);
-                        }
+                    // Nur Termine einplanen, die in der Zukunft liegen
+                    if (eventTime > now) {
+                        notificationsToSchedule.push({
+                            title: (ev.rrule === 'YEARLY' ? '🎂 ' : '⏰ ') + ev.title,
+                            body: `Heute um ${ev.start} Uhr fällig!`,
+                            id: hashCode(`${dateStr}_${ev.start}_${ev.id}`),
+                            schedule: { at: eventTime },
+                            smallIcon: 'ic_stat_icon_config_sample',
+                            actionTypeId: '',
+                            extra: null
+                        });
                     }
                 });
             }
+
+            // 3. Vorherige Alarme löschen & neue nativer System-Liste übergeben
+            try {
+                const pending = await LocalNotifications.getPending();
+                if (pending.notifications && pending.notifications.length > 0) {
+                    await LocalNotifications.cancel(pending);
+                }
+
+                if (notificationsToSchedule.length > 0) {
+                    await LocalNotifications.schedule({ notifications: notificationsToSchedule });
+                    console.log(`${notificationsToSchedule.length} Termine im Android-System eingeplant.`);
+                }
+            } catch (err) {
+                console.error("Fehler beim Planen der Benachrichtigungen:", err);
+            }
         }
 
-        // Automatisch nach dem Speichern eines neuen Termins aufrufen
+        // Automatisch nach dem Speichern eines Termins ausführen
         const originalSaveEvent = saveEvent;
         saveEvent = function() {
             originalSaveEvent();
